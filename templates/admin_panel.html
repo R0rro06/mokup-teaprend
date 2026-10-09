@@ -1,0 +1,171 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administración | TeaAcompañamos</title>
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body class="admin-page">
+    <main class="admin-shell">
+        <header class="admin-header">
+            <div>
+                <h1><i class="fa-solid fa-gear"></i> Panel de administración</h1>
+                <p>Gestiona los módulos y las lecciones guardados en la base de datos.</p>
+            </div>
+            <div class="admin-header-actions">
+                <a class="admin-link-button" href="{% url 'dashboard' %}"><i class="fa-solid fa-arrow-left"></i> Volver</a>
+                <a class="admin-link-button" href="{% url 'logout' %}"><i class="fa-solid fa-arrow-right-from-bracket"></i> Salir</a>
+            </div>
+        </header>
+
+        <section class="admin-summary" aria-label="Resumen del contenido">
+            <div class="admin-summary-card">
+                <strong>{{ total_modulos }}</strong>
+                <span>Módulos</span>
+            </div>
+            <div class="admin-summary-card">
+                <strong>{{ total_lecciones }}</strong>
+                <span>Lecciones</span>
+            </div>
+        </section>
+
+        {% if messages %}
+        <div class="admin-messages" aria-live="polite">
+            {% for message in messages %}
+            <div class="admin-message {% if message.tags == 'error' %}error{% endif %}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="admin-workspace">
+            <section class="admin-card">
+                <h2>{% if editar_modulo %}Editar módulo{% else %}Crear módulo{% endif %}</h2>
+                <p class="admin-card-description">Define el título, la descripción y la posición del módulo en la ruta de aprendizaje.</p>
+                <form method="post" class="admin-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="modulo">
+                    <input type="hidden" name="object_id" value="{{ editar_modulo|default_if_none:'' }}">
+                    {% for field in modulo_form %}
+                    <div class="admin-field">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}<small class="admin-help">{{ field.help_text }}</small>{% endif %}
+                        {% for error in field.errors %}<span class="admin-error">{{ error }}</span>{% endfor %}
+                    </div>
+                    {% endfor %}
+                    {% for error in modulo_form.non_field_errors %}<span class="admin-error">{{ error }}</span>{% endfor %}
+                    <button class="admin-submit" type="submit">
+                        {% if editar_modulo %}Guardar cambios{% else %}Crear módulo{% endif %}
+                    </button>
+                    {% if editar_modulo %}<a class="admin-cancel" href="{% url 'admin_panel' %}">Cancelar edición</a>{% endif %}
+                </form>
+
+                <div class="admin-list">
+                    <h3>Módulos existentes</h3>
+                    {% if modulos %}
+                    <div class="admin-table-wrap">
+                        <table class="admin-table">
+                            <thead>
+                                <tr><th>Orden</th><th>Módulo</th><th>Acciones</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for modulo in modulos %}
+                                <tr>
+                                    <td>{{ modulo.orden }}</td>
+                                    <td><strong>{{ modulo.titulo }}</strong><br>{{ modulo.descripcion|truncatechars:90 }}</td>
+                                    <td>
+                                        <div class="admin-item-actions">
+                                            <a class="admin-action-link" href="{% url 'admin_panel' %}?editar_modulo={{ modulo.pk }}">Editar</a>
+                                            <form method="post" action="{% url 'eliminar_contenido' %}" onsubmit="return confirm('¿Eliminar este módulo? Solo se puede eliminar si no tiene lecciones.');">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="accion" value="eliminar_modulo">
+                                                <input type="hidden" name="modulo_id" value="{{ modulo.pk }}">
+                                                <button class="admin-delete-button" type="submit">Eliminar</button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="admin-empty">Todavía no hay módulos.</p>
+                    {% endif %}
+                </div>
+            </section>
+
+            <section class="admin-card">
+                <h2>{% if editar_leccion %}Editar lección{% else %}Crear lección{% endif %}</h2>
+                <p class="admin-card-description">Asocia una afirmación y su explicación al módulo correspondiente.</p>
+                <form method="post" class="admin-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="leccion">
+                    <input type="hidden" name="object_id" value="{{ editar_leccion|default_if_none:'' }}">
+                    {% for field in leccion_form %}
+                    <div class="admin-field">
+                        {% if field.name == 'es_verdad' %}
+                        <label class="admin-checkbox-row" for="{{ field.id_for_label }}">{{ field }} {{ field.label }}</label>
+                        {% else %}
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.name == 'modulo' %}
+                        <small class="admin-help">Elige el módulo al que pertenece esta lección. Las opciones muestran su número de ruta y título.</small>
+                        {% endif %}
+                        {% endif %}
+                        {% for error in field.errors %}<span class="admin-error">{{ error }}</span>{% endfor %}
+                    </div>
+                    {% endfor %}
+                    {% for error in leccion_form.non_field_errors %}<span class="admin-error">{{ error }}</span>{% endfor %}
+                    <button class="admin-submit" type="submit">
+                        {% if editar_leccion %}Guardar cambios{% else %}Crear lección{% endif %}
+                    </button>
+                    {% if editar_leccion %}<a class="admin-cancel" href="{% url 'admin_panel' %}">Cancelar edición</a>{% endif %}
+                </form>
+
+                <div class="admin-list">
+                    <h3>Lecciones existentes</h3>
+                    {% if lecciones %}
+                    <div class="admin-table-wrap">
+                        <table class="admin-table">
+                            <thead>
+                                <tr><th>Afirmación</th><th>Módulo</th><th>Respuesta</th><th>Acciones</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for leccion in lecciones %}
+                                <tr>
+                                    <td><strong>{{ leccion.pregunta|truncatechars:100 }}</strong><br>{{ leccion.explicacion|truncatechars:80 }}</td>
+                                    <td>{{ leccion.modulo.titulo }}</td>
+                                    <td>{% if leccion.es_verdad %}Verdad{% else %}Mito{% endif %}</td>
+                                    <td>
+                                        <div class="admin-item-actions">
+                                            <a class="admin-action-link" href="{% url 'admin_panel' %}?editar_leccion={{ leccion.pk }}">Editar</a>
+                                            <form method="post" action="{% url 'eliminar_contenido' %}" onsubmit="return confirm('¿Eliminar esta lección?');">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="accion" value="eliminar_leccion">
+                                                <input type="hidden" name="leccion_id" value="{{ leccion.pk }}">
+                                                <button class="admin-delete-button" type="submit">Eliminar</button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="admin-empty">Todavía no hay lecciones.</p>
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+    </main>
+</body>
+
+</html>
